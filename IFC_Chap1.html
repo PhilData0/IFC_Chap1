@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mutual Fund Flashcards</title>
+    <!-- Tailwind CSS for layout and styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for the 3D Flip Animation */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .card-inner.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden; /* Safari support */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            border-radius: 1rem;
+        }
+
+        .card-front {
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+
+        .card-back {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            transform: rotateY(180deg);
+            overflow-y: auto; /* Allow scrolling if text is very long */
+        }
+
+        /* Smooth fade for buttons */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Text formatting */
+        .content-text {
+            white-space: pre-line; /* Preserves line breaks from data */
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body class="bg-slate-800 min-h-screen flex flex-col items-center justify-center p-4 font-sans text-gray-800">
+
+    <!-- Header -->
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl font-bold text-white mb-2">Study Session</h1>
+        <div class="text-slate-300">
+            Card <span id="current-count">1</span> of <span id="total-count">27</span>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="w-full max-w-2xl" id="game-area">
+        
+        <!-- Flashcard Container -->
+        <div class="perspective-1000 w-full h-[400px] cursor-pointer group" onclick="if(!isFlipped) flipCard()">
+            <div class="card-inner bg-white" id="card-inner">
+                
+                <!-- Front (Question) -->
+                <div class="card-face card-front border-2 border-slate-200">
+                    <h2 class="text-sm uppercase tracking-widest text-blue-600 font-bold mb-4">Question</h2>
+                    <p class="text-xl md:text-2xl font-medium content-text" id="question-text">
+                        Loading...
+                    </p>
+                    <p class="mt-8 text-xs text-gray-400 font-light animate-pulse">(Tap to reveal)</p>
+                </div>
+
+                <!-- Back (Answer) -->
+                <div class="card-face card-back border-2 border-blue-200">
+                    <h2 class="text-sm uppercase tracking-widest text-green-600 font-bold mb-4">Answer</h2>
+                    <p class="text-lg md:text-xl content-text" id="answer-text">
+                        Loading...
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="mt-8 h-20 flex justify-center items-center gap-4">
+            
+            <!-- Reveal Button (Shows initially) -->
+            <button id="btn-reveal" onclick="flipCard()" 
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                Show Answer
+            </button>
+
+            <!-- Assessment Buttons (Hidden initially) -->
+            <div id="assessment-buttons" class="hidden gap-4 w-full justify-center">
+                <button onclick="handleResult(false)" 
+                    class="flex-1 max-w-[150px] bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                    Missed it
+                </button>
+                <button onclick="handleResult(true)" 
+                    class="flex-1 max-w-[150px] bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95">
+                    Got it!
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Results Screen (Hidden initially) -->
+    <div id="results-area" class="hidden text-center bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+        <h2 class="text-3xl font-bold text-gray-800 mb-4">Session Complete!</h2>
+        <div class="text-6xl mb-6">🎉</div>
+        <p class="text-lg text-gray-600 mb-6">You scored:</p>
+        <div class="text-4xl font-bold text-blue-600 mb-8">
+            <span id="score">0</span> / <span id="total-score">0</span>
+        </div>
+        <button onclick="restartGame()" 
+            class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+            Start Over
+        </button>
+    </div>
+
+    <script>
+        // --- Data ---
+        const flashcards = [
+            // Existing Cards (1-7)
+            {
+                question: "What is the primary responsibility of a mutual fund sales rep when working with clients?",
+                answer: "A mutual fund sales representative is entrusted with helping clients select suitable mutual fund investments based on each client’s unique financial goals, personal circumstances, and risk tolerance."
+            },
+            {
+                question: "What must a mutual fund representative prioritize when recommending mutual funds, and what obligations must they uphold during the process?",
+                answer: "The representative must always place the client’s interests first and ensure legal and ethical compliance in the selection and recommendation of mutual funds."
+            },
+            {
+                question: "What are the three key aspects of a mutual fund representative’s responsibilities regarding client relationships and portfolio recommendations?",
+                answer: "1. Client-Centric Approach: Representatives should provide tailored advice that aligns with each client’s needs.\n\n2. Multi-Faceted Responsibility: Legal, ethical, and professional obligations must all be fulfilled.\n\n3. Ongoing Service: Beyond the initial sale, representatives should maintain a relationship with the client, periodically reviewing portfolio suitability."
+            },
+            {
+                question: "What are the three types of responsibilities of a Mutual fund sales rep?",
+                answer: "Legal, Ethical, and Professional responsibility."
+            },
+            {
+                question: "What legal responsibility do mutual fund representatives in Canada have when recommending investments, and where is this obligation stated?",
+                answer: "Representatives must ensure that any recommended investment is suitable for a particular client. In Canada, provincial securities acts explicitly state this responsibility."
+            },
+            {
+                question: "What does suitability mean to a mutual fund sales rep?",
+                answer: "Suitability means an investment should align with a client’s financial condition, goals, knowledge, and risk tolerance."
+            },
+            {
+                question: "What are the key elements of Suitability?",
+                answer: "Key Elements of Suitability Are:\n\n- Alignment with client goals (e.g., retirement planning, short-term savings)\n- Consistency with client’s financial condition (net worth, income, existing debts)\n- Reflection of client’s personal circumstances (family, dependents, career stage)\n- Consideration of client’s investment knowledge and experience\n- Respect for client’s risk tolerance"
+            },
+            // Existing Cards (8-10)
+            {
+                question: "What does ethical responsibility require of a mutual fund representative when balancing client interests, personal gain, and dealer firm interests?",
+                answer: "Ethical responsibility means placing the client’s interests above all else—above both personal gain and the interests of the dealer firm."
+            },
+            {
+                question: "Why does Ethical responsibility matters?",
+                answer: "Why It Matters:\n\n- Trust and Confidence: The financial industry relies on public trust; any ethical lapse can undermine investor confidence.\n- Conflict of Interest Mitigation: Ethical frameworks help ensure that performance incentives do not overshadow client welfare."
+            },
+            {
+                question: "What does the professional responsibility of a mutual funds sales rep emphasize?",
+                answer: "Professional responsibility emphasizes delivering superior client service through comprehensive knowledge of both the client and the mutual fund products."
+            },
+            // Existing Cards (11-14)
+            {
+                question: "If a mutual funds product is deemed unsuitable according to a specific client what must the mutual sales rep do?",
+                answer: "Representatives must be prepared to refuse to sell products deemed unsuitable, even if the client insists."
+            },
+            {
+                question: "What core aspects make up the professional responsibilities of a mutual fund sales representative?",
+                answer: "Core Aspects:\n\n1. “Know Your Client” (KYC): Mastering the client’s financial goals, constraints, and personal situation.\n2. “Know Your Products”: Understanding every facet of the mutual fund, including fees, charges, potential returns, and associated risks.\n3. Duty to Decline Unsuitable Sales: If a product does not align with the client’s profile, representatives should advise against the purchase or refuse the order."
+            },
+            {
+                question: "What does compliance involve for a mutual fund representative?",
+                answer: "Compliance involves adhering to the rules and regulations that govern ethical conduct and protect investors."
+            },
+            {
+                question: "If the Mutual funds dealer does not adhere to regulatory compliance what are the consequences?",
+                answer: "Consequences of Non-Compliance:\n\n- Financial Penalties: Fines or repayment of losses.\n- Suspension or Dismissal: Loss of job and professional standing.\n- Industry Ban: Potential prohibition from future practice within the securities industry."
+            },
+            // Existing Cards (15-18)
+            {
+                question: "Under the professional responsibility of a mutual funds sales rep what is KYC?",
+                answer: "KYC is part of the professional responsibility of the sales rep and stands for Know your client. This rule is central to making proper suitability decisions for clients. Representatives must use due diligence to gather and verify essential facts regarding the client."
+            },
+            {
+                question: "For KYC what are some of the essential facts to gather?",
+                answer: "Essential Facts to Gather:\n\n1. Financial Goals & Objectives: Growth, income, or capital preservation?\n2. Financial Circumstances: Income, expenses, assets, liabilities.\n3. Personal Circumstances: Life stage, dependents, career stability.\n4. Investment Knowledge: Levels can range from novice to expert.\n5. Risk Tolerance: Comfort level with volatility and potential losses.\n6. Time Horizon: Short- , medium- , or long-term investment horizons."
+            },
+            {
+                question: "Why is it important to be as accurate as possible when conducting KYC?",
+                answer: "Inaccurate or incomplete KYC information can lead to inappropriate recommendations and heightened risk of regulatory scrutiny."
+            },
+            {
+                question: "Should the representative check the data of the client periodically?",
+                answer: "Yes, the Representatives should verify and periodically update client information, as changes in a client’s life (employment shifts, marriage, etc.) can alter suitability."
+            },
+            // Existing Cards (19-24)
+            {
+                question: "What is KYP?",
+                answer: "KYP Is know your product and you must be able to know about your product just as well as your client for suitability."
+            },
+            {
+                question: "What are the aspects the representative must know about a mutual fund product?",
+                answer: "Features: Type of fund (e.g., equity, fixed income, balanced), investment strategy, management style.\n\nRisks: Market risks, credit risks, interest rate risks, currency risks (if international).\n\nFee Structure: Sales charges (front-end, deferred sales, no-load), management expense ratios (MERs), trailing commissions.\n\nTypes of Income/Gains: Dividends, interest income, capital gains distributions."
+            },
+            {
+                question: "Where can the representative find mutual fund info?",
+                answer: "Much of this information is summarized in the “Fund Facts” document for each mutual fund, often found on the fund company’s website."
+            },
+            {
+                question: "Overall, when ensuring a recommendation is suitable for a client involves assessing what aspects?",
+                answer: "Suitability involves assessing:\n\n- Personal & financial details (from KYC).\n- Nature and risk profile of the proposed fund.\n- Client’s investment objectives and constraints."
+            },
+            {
+                question: "What is a solicited order?",
+                answer: "Orders initiated by the representative’s recommendation. Suitability must be rigorously evaluated before the trade is executed."
+            },
+            {
+                question: "What is a Unsolicited order?",
+                answer: "Orders initiated by the client. The representative should still assess whether the trade is suitable. If not, the Branch Compliance Officer (BCO) may need to decide if the order can be reasonably fulfilled."
+            },
+            // New Cards (25-27)
+            {
+                question: "Can you explain the core functions of a mutual fund sales rep?",
+                answer: "1. Obtain Client Information: Gather KYC data thoroughly and update it regularly.\n2. Assess Fit: Use professional judgment to match products to the client’s risk and return profile.\n3. Explain Misfits: If a client’s requested product is unsuitable, clarify why, and propose alternatives.\n4. Sales Scope: Typically limited to mutual funds (unless the representative has additional licenses).\n5. Refer Complex Cases: For intricate financial planning, especially if budgeting or extensive tax planning is required, refer the client to an in-house Financial Planner or another qualified professional."
+            },
+            {
+                question: "If KYC is incomplete what must the Representative must do?",
+                answer: "If the KYC process is not fulfilled or the data is insufficient, the representative must refuse the order. This avoids potential regulatory violations and protects both the client and the representative."
+            },
+            {
+                question: "Finally can you remember all of the tips for aspiring representatives?",
+                answer: "1. Stay Current with Regulations: Securities regulations evolve; ongoing education is essential.\n2. Regular Client Reviews: Financial situations can change, so continuous monitoring and re-evaluation maintain suitability.\n3. Document Everything: Keep clear records of client discussions, recommendations, and updates to KYC information.\n4. Professional Development: Pursue advanced courses (e.g., CFP, additional regulatory exams) to expand competency.\n5. Maintain Ethical Vigilance: Be transparent about fees, risks, and conflicts of interest."
+            }
+        ];
+
+        // --- State ---
+        let currentIndex = 0;
+        let score = 0;
+        let isFlipped = false;
+
+        // --- DOM Elements ---
+        const cardInner = document.getElementById('card-inner');
+        const questionText = document.getElementById('question-text');
+        const answerText = document.getElementById('answer-text');
+        const currentCountEl = document.getElementById('current-count');
+        const totalCountEl = document.getElementById('total-count');
+        
+        const btnReveal = document.getElementById('btn-reveal');
+        const assessmentBtns = document.getElementById('assessment-buttons');
+        
+        const gameArea = document.getElementById('game-area');
+        const resultsArea = document.getElementById('results-area');
+        const scoreEl = document.getElementById('score');
+        const totalScoreEl = document.getElementById('total-score');
+
+        // --- Initialization ---
+        function init() {
+            totalCountEl.textContent = flashcards.length;
+            loadCard(currentIndex);
+        }
+
+        // --- Logic ---
+        function loadCard(index) {
+            // Reset UI state
+            isFlipped = false;
+            cardInner.classList.remove('is-flipped');
+            
+            // Show Reveal button, hide assessment buttons
+            btnReveal.classList.remove('hidden');
+            assessmentBtns.classList.add('hidden');
+            assessmentBtns.classList.remove('flex', 'fade-in');
+
+            // Load Text
+            const card = flashcards[index];
+            questionText.textContent = card.question;
+            answerText.textContent = card.answer;
+            currentCountEl.textContent = index + 1;
+        }
+
+        function flipCard() {
+            if (isFlipped) return; // Prevent double flip
+
+            isFlipped = true;
+            cardInner.classList.add('is-flipped');
+
+            // Hide Reveal button
+            btnReveal.classList.add('hidden');
+            
+            // Show assessment buttons with animation
+            assessmentBtns.classList.remove('hidden');
+            assessmentBtns.classList.add('flex', 'fade-in');
+        }
+
+        function handleResult(correct) {
+            if (correct) {
+                score++;
+            }
+
+            currentIndex++;
+
+            if (currentIndex < flashcards.length) {
+                // Wait a moment for the user to register the click, then flip back and load next
+                setTimeout(() => {
+                    loadCard(currentIndex);
+                }, 200);
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            gameArea.classList.add('hidden');
+            resultsArea.classList.remove('hidden');
+            scoreEl.textContent = score;
+            totalScoreEl.textContent = flashcards.length;
+        }
+
+        function restartGame() {
+            currentIndex = 0;
+            score = 0;
+            resultsArea.classList.add('hidden');
+            gameArea.classList.remove('hidden');
+            loadCard(currentIndex);
+        }
+
+        // Start the app
+        init();
+
+    </script>
+</body>
+</html>
